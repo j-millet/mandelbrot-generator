@@ -3,33 +3,7 @@
 #include <complex.h>
 #include <math.h>
 #include <stdint.h>
-
-typedef uint16_t WORD;
-typedef uint32_t DWORD;
-typedef int32_t LONG;
-
-typedef struct tagBITMAPFILEHEADER {
-  WORD  bfType;
-  DWORD bfSize;
-  WORD  bfReserved1;
-  WORD  bfReserved2;
-  DWORD bfOffBits;
-} BITMAPFILEHEADER, *LPBITMAPFILEHEADER, *PBITMAPFILEHEADER;
-
-typedef struct tagBITMAPINFOHEADER {
-  DWORD biSize;
-  LONG  biWidth;
-  LONG  biHeight;
-  WORD  biPlanes;
-  WORD  biBitCount;
-  DWORD biCompression;
-  DWORD biSizeImage;
-  LONG  biXPelsPerMeter;
-  LONG  biYPelsPerMeter;
-  DWORD biClrUsed;
-  DWORD biClrImportant;
-} BITMAPINFOHEADER, *PBITMAPINFOHEADER;
-
+#include <string.h>
 
 float map_mandel(int value, int in_min, int in_max, int out_min, int out_max)
 {
@@ -58,19 +32,51 @@ int main(int argc, char const *argv[])
     }
     int WIDTH = atoi(argv[1]);
     int HEIGHT = atoi(argv[2]);
-
-    int *pixel_values = (int *)malloc(WIDTH*HEIGHT*sizeof(int));
+    unsigned char *img = (unsigned char *)malloc(3*WIDTH*HEIGHT);
+    memset(img,0,3*WIDTH*HEIGHT);
+    
     for (int i = 0; i < HEIGHT; i++)
     {
         for (int j = 0; j < WIDTH; j++)
         {
             int val = grey_value(j,i,WIDTH,HEIGHT);
-            printf("%3d ",val);
-            pixel_values[i*WIDTH+j] = val;
+            int idx = 3*(i*WIDTH + j);
+            img[idx] = val;
+            img[idx+1] = val;
+            img[idx+2] = val;
         }
-        printf("\n");
-        
     }
-    free(pixel_values);
+
+    FILE *f = fopen(argv[3],"wb");
+    
+    unsigned char bmpfileheader[14] = {'B','M', 0,0,0,0, 0,0, 0,0, 54,0,0,0};
+    unsigned char bmpinfoheader[40] = {40,0,0,0, 0,0,0,0, 0,0,0,0, 1,0, 24,0};
+    unsigned char bmppad[3] = {0,0,0};
+
+    int filesize = 54 + 3*WIDTH*HEIGHT;
+
+    bmpfileheader[ 2] = (unsigned char)(filesize    );
+    bmpfileheader[ 3] = (unsigned char)(filesize>> 8);
+    bmpfileheader[ 4] = (unsigned char)(filesize>>16);
+    bmpfileheader[ 5] = (unsigned char)(filesize>>24);
+
+    bmpinfoheader[ 4] = (unsigned char)(       WIDTH    );
+    bmpinfoheader[ 5] = (unsigned char)(       WIDTH>> 8);
+    bmpinfoheader[ 6] = (unsigned char)(       WIDTH>>16);
+    bmpinfoheader[ 7] = (unsigned char)(       HEIGHT>>24);
+    bmpinfoheader[ 8] = (unsigned char)(       HEIGHT    );
+    bmpinfoheader[ 9] = (unsigned char)(       HEIGHT>> 8);
+    bmpinfoheader[10] = (unsigned char)(       HEIGHT>>16);
+    bmpinfoheader[11] = (unsigned char)(       HEIGHT>>24);
+    fwrite(bmpfileheader,1,14,f);
+    fwrite(bmpinfoheader,1,40,f);
+
+    for(int i=0; i<HEIGHT; i++)
+    {
+    fwrite(img+(WIDTH*(HEIGHT-i-1)*3),3,WIDTH,f);
+    fwrite(bmppad,1,(4-(WIDTH*3)%4)%4,f);
+    }
+    fclose(f);
+    free(img);
     return 0;
 }
